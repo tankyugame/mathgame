@@ -2,46 +2,62 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>無限スクロール算数ゲーム</title>
 <style>
 html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #eee;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  margin:0; padding:0;
+  background:#000; height:100%;
+  display:flex; justify-content:center; align-items:center;
+  overflow:hidden;
 }
 canvas {
-  background: #f5f5f5;
-  display: block;
-  cursor: pointer;
+  background:#f5f5f5;
+  display:block;
+  touch-action:none;
 }
 </style>
 </head>
 <body>
 
-<canvas id="game" width="800" height="600"></canvas>
+<canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+/* ===== 9:16リサイズ ===== */
+function resizeCanvas() {
+  const screenRatio = window.innerWidth / window.innerHeight;
+  const targetRatio = 9 / 16;
+  if (screenRatio > targetRatio) {
+    canvas.height = window.innerHeight;
+    canvas.width = canvas.height * targetRatio;
+  } else {
+    canvas.width = window.innerWidth;
+    canvas.height = canvas.width / targetRatio;
+  }
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
 /* ===== 定数 ===== */
 const cellSize = 100;
 const objectSize = 28;
-const objectMargin = 28;
+
+/* ===== 仮想ジョイスティック ===== */
+let joystick = { active:false, baseX:0, baseY:0, stickX:0, stickY:0, radius:70 };
 
 /* ===== 状態 ===== */
 let player, score, targetValue, lastTarget;
 let timeLeft, lastUpdateTime, gameOver;
 let effects;
-const objectMap = new Map();
+let allObjects = [];
+let generatedCells = new Set();
 
 /* ===== 初期化 ===== */
 function initGame() {
-  player = { x: 0, y: 0, size: 28, speed: 4, value: 1 };
+  player = { x: 0, y: 0, size: 28, speed: 3.2, value: 1 };
   score = 0;
   lastTarget = null;
   targetValue = getRandomTargetValue();
@@ -49,262 +65,236 @@ function initGame() {
   lastUpdateTime = performance.now();
   gameOver = false;
   effects = [];
-  objectMap.clear();
+  allObjects = [];
+  generatedCells.clear();
 }
 initGame();
 
-/* ===== 入力 ===== */
-const keys = {};
-addEventListener("keydown", e => keys[e.key] = true);
-addEventListener("keyup", e => keys[e.key] = false);
-
-/* リスタート */
-canvas.addEventListener("click", e => {
-  if (!gameOver) return;
-  const r = canvas.getBoundingClientRect();
-  const mx = e.clientX - r.left;
-  const my = e.clientY - r.top;
-  const bx = canvas.width/2 - 120;
-  const by = canvas.height/2 + 60;
-  if (mx >= bx && mx <= bx+240 && my >= by && my <= by+60) {
-    initGame();
-  }
+/* ===== ジョイスティック操作 ===== */
+canvas.addEventListener("touchstart", e=>{
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  joystick.active = true;
+  joystick.baseX = t.clientX - rect.left;
+  joystick.baseY = t.clientY - rect.top;
+  joystick.stickX = joystick.baseX;
+  joystick.stickY = joystick.baseY;
 });
 
-/* ===== 数学オブジェクト ===== */
-function randomNumberForObject() {
-  return Math.random() < 0.6
-    ? Math.floor(Math.random() * 5) + 1
-    : Math.floor(Math.random() * 5) + 6;
-}
+canvas.addEventListener("touchmove", e=>{
+  if(!joystick.active) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  let x = t.clientX - rect.left;
+  let y = t.clientY - rect.top;
+  const dx = x - joystick.baseX;
+  const dy = y - joystick.baseY;
+  const dist = Math.hypot(dx,dy);
+  if(dist > joystick.radius) {
+    const angle = Math.atan2(dy,dx);
+    x = joystick.baseX + Math.cos(angle) * joystick.radius;
+    y = joystick.baseY + Math.sin(angle) * joystick.radius;
+  }
+  joystick.stickX = x;
+  joystick.stickY = y;
+});
 
+canvas.addEventListener("touchend", ()=>{ joystick.active=false; });
+canvas.addEventListener("click", ()=>{ if(gameOver) initGame(); });
+
+/* ===== 数学オブジェクト ===== */
+function randomNumberForObject() { return Math.random() < 0.6 ? Math.floor(Math.random()*5)+1 : Math.floor(Math.random()*5)+6; }
 function randomOperation() {
   const r = Math.random();
-  let op, num;
-  if (r < 0.4) { op="+"; num=randomNumberForObject(); }
-  else if (r < 0.8) { op="-"; num=randomNumberForObject(); }
-  else if (r < 0.9) { op="*"; num=Math.floor(Math.random()*4)+2; }
-  else { op="/"; num=Math.floor(Math.random()*4)+2; }
-  return { text: op+num, op, num };
+  let op,num;
+  if(r<0.4){ op="+"; num=randomNumberForObject();}
+  else if(r<0.8){ op="-"; num=randomNumberForObject();}
+  else if(r<0.9){ op="*"; num=Math.floor(Math.random()*4)+2;}
+  else{ op="/"; num=Math.floor(Math.random()*4)+2;}
+  return {text:op+num, op, num};
 }
-
-function getRandomTargetValue() {
-  let v;
-  do { v = Math.floor(Math.random()*40)+1; }
-  while (v === lastTarget);
-  lastTarget = v;
-  return v;
+function getRandomTargetValue(){
+  let v; do{ v=Math.floor(Math.random()*40)+1; }while(v===lastTarget);
+  lastTarget=v; return v;
 }
 
 /* ===== 更新 ===== */
-function update() {
-  if (gameOver) return;
-
+function update(){
+  if(gameOver) return;
   const now = performance.now();
-  const dt = (now - lastUpdateTime) / 1000;
-  lastUpdateTime = now;
+  const dt = (now-lastUpdateTime)/1000;
+  lastUpdateTime=now;
 
-  timeLeft -= dt;
-  if (timeLeft <= 0) {
-    timeLeft = 0;
-    gameOver = true;
-    return;
+  timeLeft-=dt;
+  if(timeLeft<=0){ timeLeft=0; gameOver=true; return; }
+
+  if(joystick.active){
+    const dx = joystick.stickX - joystick.baseX;
+    const dy = joystick.stickY - joystick.baseY;
+    const dist = Math.hypot(dx,dy);
+    if(dist>5){
+      const power = Math.min(dist/joystick.radius,1);
+      const nx=dx/dist; const ny=dy/dist;
+      const speedFactor=1.1;
+      player.x += nx*player.speed*power*speedFactor;
+      player.y += ny*player.speed*power*speedFactor;
+    }
   }
 
-  let dx=0, dy=0;
-  if (keys["ArrowUp"]) dy--;
-  if (keys["ArrowDown"]) dy++;
-  if (keys["ArrowLeft"]) dx--;
-  if (keys["ArrowRight"]) dx++;
+  effects.forEach(e=>{ e.alpha-=0.02; e.size+=3; });
+  effects = effects.filter(e=>e.alpha>0);
+}
 
-  if (dx || dy) {
-    const l = Math.hypot(dx,dy);
-    player.x += dx/l * player.speed;
-    player.y += dy/l * player.speed;
+/* ===== 背景グリッド ===== */
+function drawBackground(cx,cy){
+  ctx.fillStyle="#f5f5f5"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle="#ddd"; ctx.lineWidth=1;
+  for(let x=-cx%cellSize;x<canvas.width;x+=cellSize){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
   }
-
-  // 達成演出更新
-  effects.forEach(e => {
-    e.alpha -= 0.02;
-    e.size += 3;
-  });
-  effects = effects.filter(e => e.alpha > 0);
+  for(let y=-cy%cellSize;y<canvas.height;y+=cellSize){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+  }
 }
 
-/* ===== オブジェクト生成 ===== */
-function isValidPosition(objs,x,y) {
-  return !objs.some(o => Math.hypot(o.x-x,o.y-y) < objectSize*2+objectMargin);
-}
-
-function generateObjects(cx,cy) {
-  const sx = Math.floor(cx/cellSize)-1;
-  const sy = Math.floor(cy/cellSize)-1;
+/* ===== 数字玉生成 ===== */
+function generateObjects(cx,cy){
+  const sx = Math.floor(cx / cellSize)-1;
+  const sy = Math.floor(cy / cellSize)-1;
   const ex = Math.floor((cx+canvas.width)/cellSize)+1;
   const ey = Math.floor((cy+canvas.height)/cellSize)+1;
 
-  for (let x=sx;x<=ex;x++) {
-    for (let y=sy;y<=ey;y++) {
-      const key=`${x},${y}`;
-      if (!objectMap.has(key)) {
-        const objs=[];
-        if (Math.random()<0.3) {
-          let ox,oy,t=0;
-          do {
-            ox=x*cellSize+Math.random()*cellSize;
-            oy=y*cellSize+Math.random()*cellSize;
-            t++;
-          } while(!isValidPosition(objs,ox,oy)&&t<50);
-          objs.push({x:ox,y:oy,size:objectSize,value:randomOperation()});
+  const minDistance = player.size*2; // プレイヤー直径*2以上
+
+  for(let x=sx;x<=ex;x++){
+    for(let y=sy;y<=ey;y++){
+      const key = `${x},${y}`;
+      if(generatedCells.has(key)) continue;
+
+      if(Math.random()<0.3){
+        let attempts=0;
+        let placed=false;
+        while(!placed && attempts<50){
+          attempts++;
+          const ox = x*cellSize + Math.random()*cellSize;
+          const oy = y*cellSize + Math.random()*cellSize;
+
+          let tooClose=false;
+          for(const o of allObjects){
+            if(Math.hypot(o.x-ox,o.y-oy)<minDistance){ tooClose=true; break; }
+          }
+
+          if(!tooClose){
+            const obj = {x:ox,y:oy,size:objectSize,value:randomOperation()};
+            allObjects.push(obj);
+            placed=true;
+          }
         }
-        objectMap.set(key,objs);
       }
+      generatedCells.add(key);
     }
   }
 }
 
 /* ===== 演算 ===== */
-function applyOperation(o) {
+function applyOperation(o){
   const {op,num}=o.value;
-  if (op==="+") player.value+=num;
-  if (op==="-") player.value-=num;
-  if (op==="*") player.value*=num;
-  if (op==="/") player.value=Math.floor(player.value/num);
+  if(op==="+") player.value+=num;
+  if(op==="-") player.value-=num;
+  if(op==="*") player.value*=num;
+  if(op==="/") player.value=Math.floor(player.value/num);
+  player.value=Math.max(0,player.value);
 
-  if (player.value===targetValue) {
+  if(player.value===targetValue){
     score++;
-    timeLeft+=5; // ← ここを +5秒 に変更
-    effects.push({
-      value: player.value,
-      x: canvas.width/2,
-      y: canvas.height/2,
-      alpha: 1,
-      size: 60
-    });
+    timeLeft+=5;
+    effects.push({value:player.value,x:canvas.width/2,y:canvas.height/2,alpha:1,size:60});
     targetValue=getRandomTargetValue();
   }
 }
 
 /* ===== 描画 ===== */
-function drawBackground(cx,cy) {
-  ctx.fillStyle="#f5f5f5";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle="#ccc";
-
-  for (let x=-cx%cellSize;x<canvas.width;x+=cellSize) {
-    ctx.beginPath();
-    ctx.moveTo(x,0);
-    ctx.lineTo(x,canvas.height);
-    ctx.stroke();
-  }
-  for (let y=-cy%cellSize;y<canvas.height;y+=cellSize) {
-    ctx.beginPath();
-    ctx.moveTo(0,y);
-    ctx.lineTo(canvas.width,y);
-    ctx.stroke();
-  }
-}
-
-function drawObjects(cx,cy) {
-  generateObjects(cx,cy);
-  objectMap.forEach(objs=>{
-    for (let i=objs.length-1;i>=0;i--) {
-      const o=objs[i];
-      if (Math.hypot(o.x-player.x,o.y-player.y)<o.size+player.size) {
-        applyOperation(o);
-        objs.splice(i,1);
-        continue;
-      }
-      const x=o.x-cx, y=o.y-cy;
-      ctx.fillStyle="blue";
-      ctx.beginPath();
-      ctx.arc(x,y,o.size,0,Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle="white";
-      ctx.font="bold 26px Arial";
-      ctx.textAlign="center";
-      ctx.textBaseline="middle";
-      ctx.fillText(o.value.text,x,y);
+function drawObjects(cx,cy){
+  for(let i=allObjects.length-1;i>=0;i--){
+    const o=allObjects[i];
+    if(Math.hypot(o.x-player.x,o.y-player.y)<o.size+player.size){
+      applyOperation(o);
+      allObjects.splice(i,1);
+      continue;
     }
-  });
+    const x=o.x-cx, y=o.y-cy;
+    ctx.fillStyle="blue"; ctx.beginPath(); ctx.arc(x,y,o.size,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="white"; ctx.font="bold 22px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(o.value.text,x,y);
+  }
 }
 
-function drawPlayer() {
-  const x=canvas.width/2, y=canvas.height/2;
-  ctx.fillStyle="red";
-  ctx.beginPath();
-  ctx.arc(x,y,player.size,0,Math.PI*2);
-  ctx.fill();
-  ctx.fillStyle="white";
-  ctx.font="bold 28px Arial";
-  ctx.fillText(player.value,x,y);
+function drawPlayer(){
+  const x=canvas.width/2,y=canvas.height/2;
+  ctx.fillStyle="red"; ctx.beginPath(); ctx.arc(x,y,player.size,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="white"; ctx.font="bold 24px Arial"; ctx.fillText(player.value,x,y);
 }
 
-function drawUI() {
-  ctx.fillStyle="rgba(0,0,0,0.5)";
-  ctx.fillRect(15,15,240,90);
-  ctx.fillStyle="white";
-  ctx.font="bold 26px Arial";
-  ctx.textAlign="left";
-  ctx.fillText(`スコア: ${score}`,25,50);
-  ctx.fillText(`残り時間: ${Math.ceil(timeLeft)}秒`,25,85);
+/* ===== UI描画（上下逆） ===== */
+function drawScoreTime(){
+  const w=220, h=70;
+  const x = canvas.width/2 - w/2;
+  const y = 10; // 画面上端にスコア・タイマー
+  ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle="white"; ctx.font="bold 20px Arial"; ctx.textAlign="center";
+  ctx.fillText(`スコア: ${score}`,canvas.width/2,y+25);
+  ctx.fillText(`残り時間: ${Math.ceil(timeLeft)}秒`,canvas.width/2,y+50);
 }
 
-function drawTarget() {
+function drawTarget(){
   ctx.fillStyle="rgba(255,215,0,0.25)";
-  ctx.fillRect(canvas.width/2-120,10,240,50);
-  ctx.strokeStyle="gold";
-  ctx.strokeRect(canvas.width/2-120,10,240,50);
-  ctx.fillStyle="#ff9800";
-  ctx.font="bold 28px Arial"; // ← 少し小さくした
-  ctx.textAlign="center";
-  ctx.fillText(`目標 ${targetValue}`,canvas.width/2,45);
+  const w = 200, h=50;
+  const x = canvas.width/2 - w/2;
+  const y = 90; // スコアタイマーの下に目標値
+  ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle="gold"; ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle="#ff9800"; ctx.font="bold 24px Arial"; ctx.textAlign="center";
+  ctx.fillText(`目標 ${targetValue}`,canvas.width/2,y+h/2+2);
 }
 
-/* ★ 達成演出 */
-function drawEffects() {
+function drawJoystick(){
+  if(!joystick.active) return;
+  ctx.beginPath(); ctx.arc(joystick.baseX,joystick.baseY,joystick.radius,0,Math.PI*2); ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.fill();
+  ctx.beginPath(); ctx.arc(joystick.stickX,joystick.stickY,joystick.radius/2,0,Math.PI*2); ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fill();
+}
+
+function drawEffects(){
   effects.forEach(e=>{
     ctx.fillStyle=`rgba(255,215,0,${e.alpha})`;
-    ctx.font=`bold ${e.size}px Arial`;
-    ctx.textAlign="center";
-    ctx.textBaseline="middle";
+    ctx.font=`bold ${e.size}px Arial`; ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.fillText(e.value,e.x,e.y);
   });
 }
 
-function drawGameOver() {
-  ctx.fillStyle="rgba(0,0,0,0.75)";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="white";
-  ctx.textAlign="center";
-  ctx.font="bold 50px Arial";
-  ctx.fillText("ゲームオーバー",canvas.width/2,canvas.height/2-80);
-  ctx.font="bold 32px Arial";
-  ctx.fillText(`スコア: ${score}`,canvas.width/2,canvas.height/2-20);
-  ctx.fillStyle="#2196f3";
-  ctx.fillRect(canvas.width/2-120,canvas.height/2+60,240,60);
-  ctx.fillStyle="white";
-  ctx.font="bold 28px Arial";
-  ctx.fillText("リスタート",canvas.width/2,canvas.height/2+100);
+function drawGameOver(){
+  ctx.fillStyle="rgba(0,0,0,0.75)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="white"; ctx.textAlign="center"; ctx.font="bold 40px Arial";
+  ctx.fillText("ゲームオーバー",canvas.width/2,canvas.height/2-40);
+  ctx.fillText(`スコア: ${score}`,canvas.width/2,canvas.height/2);
+  ctx.font="bold 24px Arial"; ctx.fillText("タップでリスタート",canvas.width/2,canvas.height/2+60);
 }
 
-function draw() {
+/* ===== 描画ループ ===== */
+function draw(){
   const cx=player.x-canvas.width/2;
   const cy=player.y-canvas.height/2;
   drawBackground(cx,cy);
+  generateObjects(cx,cy);
   drawObjects(cx,cy);
   drawPlayer();
-  drawUI();
-  drawTarget();
-  drawEffects(); // ← 達成演出
-  if (gameOver) drawGameOver();
+  drawScoreTime(); // 上
+  drawTarget();    // 下
+  drawEffects();
+  drawJoystick();
+  if(gameOver) drawGameOver();
 }
 
-/* ===== ループ ===== */
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
 loop();
 </script>
 
