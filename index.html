@@ -4,24 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>四則演算ゲーム</title>
-
-<meta property="og:type" content="website">
-<meta property="og:title" content="四則演算ゲーム">
-<meta property="og:description" content="数字の玉を集めて目標の数を目指す、爽快サイバー四則演算ゲーム！">
-）を外して画像URLを入れてください -->
 <style>
 html, body {
-  margin: 0; padding: 0;
-  background: #05050a; height: 100%;
-  display: flex; justify-content: center; align-items: center;
-  overflow: hidden;
-  font-family: 'Courier New', Courier, monospace;
+  margin: 0; padding: 0;
+  background: #05050a; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
 }
 canvas {
-  background: #020208;
-  display: block;
-  touch-action: none;
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+  background: #020208;
+  display: block;
+  touch-action: none;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
 }
 </style>
 </head>
@@ -35,22 +30,22 @@ const ctx = canvas.getContext("2d");
 
 /* ===== 9:16リサイズ ===== */
 function resizeCanvas() {
-  const screenRatio = window.innerWidth / window.innerHeight;
-  const targetRatio = 9 / 16;
-  if (screenRatio > targetRatio) {
-    canvas.height = window.innerHeight;
-    canvas.width = canvas.height * targetRatio;
-  } else {
-    canvas.width = window.innerWidth;
-    canvas.height = canvas.width / targetRatio;
-  }
+  const screenRatio = window.innerWidth / window.innerHeight;
+  const targetRatio = 9 / 16;
+  if (screenRatio > targetRatio) {
+    canvas.height = window.innerHeight;
+    canvas.width = canvas.height * targetRatio;
+  } else {
+    canvas.width = window.innerWidth;
+    canvas.height = canvas.width / targetRatio;
+  }
 }
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
 /* ===== 定数（サイズを拡大） ===== */
-const cellSize = 130;       // マップ全体の密度調整
-const objectSize = 32;     // 数字玉のサイズ変更：26 ➔ 32
+const cellSize = 130;       // マップ全体の密度調整
+const objectSize = 32;     // 数字玉のサイズ変更：26 ➔ 32
 
 /* ===== 仮想ジョイスティック ===== */
 let joystick = { active: false, baseX: 0, baseY: 0, stickX: 0, stickY: 0, radius: 60 };
@@ -58,433 +53,433 @@ let joystick = { active: false, baseX: 0, baseY: 0, stickX: 0, stickY: 0, radius
 /* ===== 状態変数 ===== */
 let player, score, targetValue, lastTarget;
 let timeLeft, totalTime = 60, lastUpdateTime, gameOver;
-let effects = []; 
-let particles = []; 
-let trails = []; 
+let effects = []; 
+let particles = []; 
+let trails = []; 
 let allObjects = [];
 let generatedCells = new Set();
-let globalTimer = 0; 
+let globalTimer = 0; 
 
 /* ===== 初期化 ===== */
 function initGame() {
-  player = { x: 0, y: 0, size: 30, speed: 4.2, value: 1 }; // プレイヤーサイズ変更：24 ➔ 30
-  score = 0;
-  lastTarget = null;
-  targetValue = getRandomTargetValue();
-  timeLeft = totalTime;
-  lastUpdateTime = performance.now();
-  gameOver = false;
-  effects = [];
-  particles = [];
-  trails = [];
-  allObjects = [];
-  generatedCells.clear();
+  player = { x: 0, y: 0, size: 30, speed: 4.2, value: 1 }; // プレイヤーサイズ変更：24 ➔ 30
+  score = 0;
+  lastTarget = null;
+  targetValue = getRandomTargetValue();
+  timeLeft = totalTime;
+  lastUpdateTime = performance.now();
+  gameOver = false;
+  effects = [];
+  particles = [];
+  trails = [];
+  allObjects = [];
+  generatedCells.clear();
 }
 initGame();
 
 /* ===== 操作イベント ===== */
 canvas.addEventListener("touchstart", e => {
-  const rect = canvas.getBoundingClientRect();
-  const t = e.touches[0];
-  joystick.active = true;
-  joystick.baseX = t.clientX - rect.left;
-  joystick.baseY = t.clientY - rect.top;
-  joystick.stickX = joystick.baseX;
-  joystick.stickY = joystick.baseY;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  joystick.active = true;
+  joystick.baseX = t.clientX - rect.left;
+  joystick.baseY = t.clientY - rect.top;
+  joystick.stickX = joystick.baseX;
+  joystick.stickY = joystick.baseY;
 });
 
 canvas.addEventListener("touchmove", e => {
-  if (!joystick.active) return;
-  const rect = canvas.getBoundingClientRect();
-  const t = e.touches[0];
-  let x = t.clientX - rect.left;
-  let y = t.clientY - rect.top;
-  const dx = x - joystick.baseX;
-  const dy = y - joystick.baseY;
-  const dist = Math.hypot(dx, dy);
-  if (dist > joystick.radius) {
-    const angle = Math.atan2(dy, dx);
-    x = joystick.baseX + Math.cos(angle) * joystick.radius;
-    y = joystick.baseY + Math.sin(angle) * joystick.radius;
-  }
-  joystick.stickX = x;
-  joystick.stickY = y;
+  if (!joystick.active) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  let x = t.clientX - rect.left;
+  let y = t.clientY - rect.top;
+  const dx = x - joystick.baseX;
+  const dy = y - joystick.baseY;
+  const dist = Math.hypot(dx, dy);
+  if (dist > joystick.radius) {
+    const angle = Math.atan2(dy, dx);
+    x = joystick.baseX + Math.cos(angle) * joystick.radius;
+    y = joystick.baseY + Math.sin(angle) * joystick.radius;
+  }
+  joystick.stickX = x;
+  joystick.stickY = y;
 });
 
 canvas.addEventListener("touchend", () => { joystick.active = false; });
 canvas.addEventListener("click", () => { if (gameOver) initGame(); });
 
 /* ===== 数学ロジック ===== */
-function randomNumberForObject() { 
-  return Math.random() < 0.6 ? Math.floor(Math.random() * 5) + 1 : Math.floor(Math.random() * 5) + 6; 
+function randomNumberForObject() { 
+  return Math.random() < 0.6 ? Math.floor(Math.random() * 5) + 1 : Math.floor(Math.random() * 5) + 6; 
 }
 function randomOperation() {
-  const r = Math.random();
-  let op, num, color;
-  if (r < 0.35) { op = "+"; num = randomNumberForObject(); color = "#00ffcc"; } 
-  else if (r < 0.70) { op = "-"; num = randomNumberForObject(); color = "#ff0055"; } 
-  else if (r < 0.88) { op = "×"; num = Math.floor(Math.random() * 3) + 2; color = "#ffff00"; } 
-  else { op = "÷"; num = Math.floor(Math.random() * 3) + 2; color = "#00ff00"; } 
-  return { text: op + num, op, num, color };
+  const r = Math.random();
+  let op, num, color;
+  if (r < 0.35) { op = "+"; num = randomNumberForObject(); color = "#00ffcc"; } 
+  else if (r < 0.70) { op = "-"; num = randomNumberForObject(); color = "#ff0055"; } 
+  else if (r < 0.88) { op = "×"; num = Math.floor(Math.random() * 3) + 2; color = "#ffff00"; } 
+  else { op = "÷"; num = Math.floor(Math.random() * 3) + 2; color = "#00ff00"; } 
+  return { text: op + num, op, num, color };
 }
 function getRandomTargetValue() {
-  let v; do { v = Math.floor(Math.random() * 50) + 1; } while (v === lastTarget);
-  lastTarget = v; return v;
+  let v; do { v = Math.floor(Math.random() * 50) + 1; } while (v === lastTarget);
+  lastTarget = v; return v;
 }
 
 /* ===== パーティクル生成 ===== */
 function createExplosion(x, y, color) {
-  for (let i = 0; i < 12; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 3 + 2;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      size: Math.random() * 3 + 2,
-      color,
-      alpha: 1,
-      decay: Math.random() * 0.03 + 0.02
-    });
-  }
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 3 + 2;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: Math.random() * 3 + 2,
+      color,
+      alpha: 1,
+      decay: Math.random() * 0.03 + 0.02
+    });
+  }
 }
 
 /* ===== アップデートループ ===== */
 function update() {
-  globalTimer++;
-  const now = performance.now();
-  const dt = (now - lastUpdateTime) / 1000;
-  lastUpdateTime = now;
+  globalTimer++;
+  const now = performance.now();
+  const dt = (now - lastUpdateTime) / 1000;
+  lastUpdateTime = now;
 
-  if (gameOver) return;
+  if (gameOver) return;
 
-  timeLeft -= dt;
-  if (timeLeft <= 0) { timeLeft = 0; gameOver = true; return; }
+  timeLeft -= dt;
+  if (timeLeft <= 0) { timeLeft = 0; gameOver = true; return; }
 
-  if (joystick.active) {
-    const dx = joystick.stickX - joystick.baseX;
-    const dy = joystick.stickY - joystick.baseY;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 5) {
-      const power = Math.min(dist / joystick.radius, 1);
-      const nx = dx / dist; const ny = dy / dist;
-      player.x += nx * player.speed * power * 1.2;
-      player.y += ny * player.speed * power * 1.2;
+  if (joystick.active) {
+    const dx = joystick.stickX - joystick.baseX;
+    const dy = joystick.stickY - joystick.baseY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 5) {
+      const power = Math.min(dist / joystick.radius, 1);
+      const nx = dx / dist; const ny = dy / dist;
+      player.x += nx * player.speed * power * 1.2;
+      player.y += ny * player.speed * power * 1.2;
 
-      if (globalTimer % 3 === 0) {
-        trails.push({ x: player.x, y: player.y, alpha: 0.5, size: player.size });
-      }
-    }
-  }
+      if (globalTimer % 3 === 0) {
+        trails.push({ x: player.x, y: player.y, alpha: 0.5, size: player.size });
+      }
+    }
+  }
 
-  trails.forEach(t => { t.alpha -= 0.04; t.size *= 0.95; });
-  trails = trails.filter(t => t.alpha > 0);
+  trails.forEach(t => { t.alpha -= 0.04; t.size *= 0.95; });
+  trails = trails.filter(t => t.alpha > 0);
 
-  effects.forEach(e => { e.alpha -= 0.02; e.size += 2; });
-  effects = effects.filter(e => e.alpha > 0);
+  effects.forEach(e => { e.alpha -= 0.02; e.size += 2; });
+  effects = effects.filter(e => e.alpha > 0);
 
-  particles.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.alpha -= p.decay;
-  });
-  particles = particles.filter(p => p.alpha > 0);
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -= p.decay;
+  });
+  particles = particles.filter(p => p.alpha > 0);
 }
 
 /* ===== 背景グリッド ===== */
 function drawBackground(cx, cy) {
-  ctx.fillStyle = "#03030c";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#03030c";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.strokeStyle = "rgba(0, 240, 255, 0.07)";
-  ctx.lineWidth = 1;
-  for (let x = -cx % cellSize; x < canvas.width; x += cellSize) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-  }
-  for (let y = -cy % cellSize; y < canvas.height; y += cellSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-  }
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.07)";
+  ctx.lineWidth = 1;
+  for (let x = -cx % cellSize; x < canvas.width; x += cellSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = -cy % cellSize; y < canvas.height; y += cellSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
 
-  ctx.fillStyle = "rgba(255, 255, 255, 0.015)";
-  for (let i = 0; i < canvas.height; i += 4) {
-    ctx.fillRect(0, i + (globalTimer % 4), canvas.width, 1);
-  }
+  ctx.fillStyle = "rgba(255, 255, 255, 0.015)";
+  for (let i = 0; i < canvas.height; i += 4) {
+    ctx.fillRect(0, i + (globalTimer % 4), canvas.width, 1);
+  }
 }
 
 /* ===== オブジェクト生成 ===== */
 function generateObjects(cx, cy) {
-  const sx = Math.floor(cx / cellSize) - 1;
-  const sy = Math.floor(cy / cellSize) - 1;
-  const ex = Math.floor((cx + canvas.width) / cellSize) + 1;
-  const ey = Math.floor((cy + canvas.height) / cellSize) + 1;
-  const minDistance = player.size * 3.5;
+  const sx = Math.floor(cx / cellSize) - 1;
+  const sy = Math.floor(cy / cellSize) - 1;
+  const ex = Math.floor((cx + canvas.width) / cellSize) + 1;
+  const ey = Math.floor((cy + canvas.height) / cellSize) + 1;
+  const minDistance = player.size * 3.5;
 
-  for (let x = sx; x <= ex; x++) {
-    for (let y = sy; y <= ey; y++) {
-      const key = `${x},${y}`;
-      if (generatedCells.has(key)) continue;
+  for (let x = sx; x <= ex; x++) {
+    for (let y = sy; y <= ey; y++) {
+      const key = `${x},${y}`;
+      if (generatedCells.has(key)) continue;
 
-      if (Math.random() < 0.25) {
-        let attempts = 0;
-        let placed = false;
-        while (!placed && attempts < 20) {
-          attempts++;
-          const ox = x * cellSize + Math.random() * cellSize;
-          const oy = y * cellSize + Math.random() * cellSize;
+      if (Math.random() < 0.25) {
+        let attempts = 0;
+        let placed = false;
+        while (!placed && attempts < 20) {
+          attempts++;
+          const ox = x * cellSize + Math.random() * cellSize;
+          const oy = y * cellSize + Math.random() * cellSize;
 
-          let tooClose = false;
-          for (const o of allObjects) {
-            if (Math.hypot(o.x - ox, o.y - oy) < minDistance) { tooClose = true; break; }
-          }
+          let tooClose = false;
+          for (const o of allObjects) {
+            if (Math.hypot(o.x - ox, o.y - oy) < minDistance) { tooClose = true; break; }
+          }
 
-          if (!tooClose) {
-            allObjects.push({ x: ox, y: oy, size: objectSize, value: randomOperation() });
-            placed = true;
-          }
-        }
-      }
-      generatedCells.add(key);
-    }
-  }
+          if (!tooClose) {
+            allObjects.push({ x: ox, y: oy, size: objectSize, value: randomOperation() });
+            placed = true;
+          }
+        }
+      }
+      generatedCells.add(key);
+    }
+  }
 }
 
 /* ===== 演算処理 ===== */
 function applyOperation(o) {
-  const { op, num, color } = o.value;
+  const { op, num, color } = o.value;
 
-  if (op === "+") player.value += num;
-  if (op === "-") player.value -= num;
-  if (op === "×") player.value *= num;
-  if (op === "÷") player.value = Math.floor(player.value / num);
-  player.value = Math.max(0, player.value);
+  if (op === "+") player.value += num;
+  if (op === "-") player.value -= num;
+  if (op === "×") player.value *= num;
+  if (op === "÷") player.value = Math.floor(player.value / num);
+  player.value = Math.max(0, player.value);
 
-  createExplosion(canvas.width / 2, canvas.height / 2, color);
+  createExplosion(canvas.width / 2, canvas.height / 2, color);
 
-  if (player.value === targetValue) {
-    score++;
-    timeLeft = Math.min(totalTime, timeLeft + 8); 
-    effects.push({ text: "MATCH!", x: canvas.width / 2, y: canvas.height / 2 - 30, alpha: 1, size: 50, color: "#00ffcc" });
-    targetValue = getRandomTargetValue();
-    createExplosion(canvas.width / 2, canvas.height / 2, "#ffff00");
-  }
+  if (player.value === targetValue) {
+    score++;
+    timeLeft = Math.min(totalTime, timeLeft + 8); 
+    effects.push({ text: "MATCH!", x: canvas.width / 2, y: canvas.height / 2 - 30, alpha: 1, size: 50, color: "#00ffcc" });
+    targetValue = getRandomTargetValue();
+    createExplosion(canvas.width / 2, canvas.height / 2, "#ffff00");
+  }
 }
 
 /* ===== オブジェクト描画 ===== */
 function drawObjects(cx, cy) {
-  for (let i = allObjects.length - 1; i >= 0; i--) {
-    const o = allObjects[i];
-    if (Math.hypot(o.x - player.x, o.y - player.y) < o.size + player.size - 4) {
-      applyOperation(o);
-      allObjects.splice(i, 1);
-      continue;
-    }
+  for (let i = allObjects.length - 1; i >= 0; i--) {
+    const o = allObjects[i];
+    if (Math.hypot(o.x - player.x, o.y - player.y) < o.size + player.size - 4) {
+      applyOperation(o);
+      allObjects.splice(i, 1);
+      continue;
+    }
 
-    const x = o.x - cx;
-    const y = o.y - cy;
+    const x = o.x - cx;
+    const y = o.y - cy;
 
-    if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) continue;
+    if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) continue;
 
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = o.value.color;
-    
-    ctx.fillStyle = "rgba(10, 10, 25, 0.85)";
-    ctx.strokeStyle = o.value.color;
-    ctx.lineWidth = 2.5;
-    
-    ctx.beginPath();
-    ctx.arc(x, y, o.size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = o.value.color;
+    
+    ctx.fillStyle = "rgba(10, 10, 25, 0.85)";
+    ctx.strokeStyle = o.value.color;
+    ctx.lineWidth = 2.5;
+    
+    ctx.beginPath();
+    ctx.arc(x, y, o.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.shadowBlur = 0;
 
-    // 玉のテキストサイズ変更：18px ➔ 22px
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 22px 'Courier New'"; 
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(o.value.text, x, y);
-  }
+    // 玉のテキストサイズ変更：18px ➔ 22px
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 22px 'Courier New'"; 
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(o.value.text, x, y);
+  }
 }
 
 /* ===== プレイヤー描画 ===== */
 function drawPlayer() {
-  const x = canvas.width / 2;
-  const y = canvas.height / 2;
+  const x = canvas.width / 2;
+  const y = canvas.height / 2;
 
-  trails.forEach(t => {
-    ctx.fillStyle = `rgba(0, 255, 255, ${t.alpha * 0.4})`;
-    ctx.beginPath();
-    ctx.arc(t.x - player.x + x, t.y - player.y + y, t.size, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  trails.forEach(t => {
+    ctx.fillStyle = `rgba(0, 255, 255, ${t.alpha * 0.4})`;
+    ctx.beginPath();
+    ctx.arc(t.x - player.x + x, t.y - player.y + y, t.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = "#00ffff";
-  
-  ctx.strokeStyle = "#00ffff";
-  ctx.lineWidth = 3.5;
-  ctx.fillStyle = "#050a15";
-  ctx.beginPath();
-  ctx.arc(x, y, player.size, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  
-  ctx.shadowBlur = 0;
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = "#00ffff";
+  
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 3.5;
+  ctx.fillStyle = "#050a15";
+  ctx.beginPath();
+  ctx.arc(x, y, player.size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.shadowBlur = 0;
 
-  // プレイヤーのテキストサイズ変更：22px ➔ 28px
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 28px 'Courier New'"; 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(player.value, x, y);
+  // プレイヤーのテキストサイズ変更：22px ➔ 28px
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 28px 'Courier New'"; 
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(player.value, x, y);
 }
 
 /* ===== パーティクル描画 ===== */
 function drawParticles() {
-  particles.forEach(p => {
-    ctx.fillStyle = p.color;
-    ctx.globalAlpha = p.alpha;
-    ctx.fillRect(p.x, p.y, p.size, p.size);
-  });
-  ctx.globalAlpha = 1.0; 
+  particles.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.alpha;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+  });
+  ctx.globalAlpha = 1.0; 
 }
 
 /* ===== サイバーUI（全体的に文字拡大） ===== */
 function drawUI() {
-  const pad = 16;
-  
-  // --- スコア＆タイマー ---
-  ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(pad, pad, canvas.width - pad * 2, 65);
-  ctx.fillStyle = "rgba(5, 5, 15, 0.8)";
-  ctx.fillRect(pad, pad, canvas.width - pad * 2, 65);
+  const pad = 16;
+  
+  // --- スコア＆タイマー ---
+  ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pad, pad, canvas.width - pad * 2, 65);
+  ctx.fillStyle = "rgba(5, 5, 15, 0.8)";
+  ctx.fillRect(pad, pad, canvas.width - pad * 2, 65);
 
-  // スコア文字拡大：15px ➔ 18px
-  ctx.fillStyle = "#00ffcc";
-  ctx.font = "bold 18px 'Courier New'";
-  ctx.textAlign = "left";
-  ctx.fillText(`SCORE: ${String(score).padStart(4, '0')}`, pad + 15, pad + 38);
+  // スコア文字拡大：15px ➔ 18px
+  ctx.fillStyle = "#00ffcc";
+  ctx.font = "bold 18px 'Courier New'";
+  ctx.textAlign = "left";
+  ctx.fillText(`SCORE: ${String(score).padStart(4, '0')}`, pad + 15, pad + 38);
 
-  // タイマーバー
-  const barWidth = 110;
-  const barHeight = 10;
-  const barX = canvas.width - pad - barWidth - 15;
-  const barY = pad + 28;
-  const ratio = timeLeft / totalTime;
-  
-  ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-  ctx.fillRect(barX, barY, barWidth, barHeight);
-  ctx.fillStyle = ratio > 0.3 ? "#00ffcc" : "#ff0055";
-  ctx.fillRect(barX, barY, barWidth * ratio, barHeight);
-  
-  ctx.font = "11px 'Courier New'";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("LIMIT_TIME", barX, barY - 6);
+  // タイマーバー
+  const barWidth = 110;
+  const barHeight = 10;
+  const barX = canvas.width - pad - barWidth - 15;
+  const barY = pad + 28;
+  const ratio = timeLeft / totalTime;
+  
+  ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+  ctx.fillRect(barX, barY, barWidth, barHeight);
+  ctx.fillStyle = ratio > 0.3 ? "#00ffcc" : "#ff0055";
+  ctx.fillRect(barX, barY, barWidth * ratio, barHeight);
+  
+  ctx.font = "11px 'Courier New'";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("LIMIT_TIME", barX, barY - 6);
 
-  // --- 目標値ウィンドウ ---
-  const ty = pad + 80;
-  ctx.strokeStyle = "rgba(255, 215, 0, 0.5)";
-  ctx.strokeRect(pad, ty, canvas.width - pad * 2, 55);
-  ctx.fillStyle = "rgba(20, 15, 5, 0.8)";
-  ctx.fillRect(pad, ty, canvas.width - pad * 2, 55);
+  // --- 目標値ウィンドウ ---
+  const ty = pad + 80;
+  ctx.strokeStyle = "rgba(255, 215, 0, 0.5)";
+  ctx.strokeRect(pad, ty, canvas.width - pad * 2, 55);
+  ctx.fillStyle = "rgba(20, 15, 5, 0.8)";
+  ctx.fillRect(pad, ty, canvas.width - pad * 2, 55);
 
-  // ターゲット文字大幅拡大：20px ➔ 26px
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#ffaa00";
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = "#ffaa00";
-  ctx.font = "bold 26px 'Courier New'"; 
-  ctx.fillText(`▶ TARGET: ${targetValue} ◀`, canvas.width / 2, ty + 36);
-  ctx.shadowBlur = 0;
+  // ターゲット文字大幅拡大：20px ➔ 26px
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffaa00";
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#ffaa00";
+  ctx.font = "bold 26px 'Courier New'"; 
+  ctx.fillText(`▶ TARGET: ${targetValue} ◀`, canvas.width / 2, ty + 36);
+  ctx.shadowBlur = 0;
 }
 
 /* ===== ジョイスティック描画 ===== */
 function drawJoystick() {
-  if (!joystick.active) return;
-  ctx.shadowBlur = 6;
-  ctx.shadowColor = "#00ffff";
-  
-  ctx.beginPath();
-  ctx.arc(joystick.baseX, joystick.baseY, joystick.radius, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 240, 255, 0.05)";
-  ctx.strokeStyle = "rgba(0, 240, 255, 0.25)";
-  ctx.lineWidth = 2;
-  ctx.fill();
-  ctx.stroke();
+  if (!joystick.active) return;
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = "#00ffff";
+  
+  ctx.beginPath();
+  ctx.arc(joystick.baseX, joystick.baseY, joystick.radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 240, 255, 0.05)";
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.25)";
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(joystick.stickX, joystick.stickY, joystick.radius / 2.5, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 240, 255, 0.4)";
-  ctx.fill();
-  
-  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(joystick.stickX, joystick.stickY, joystick.radius / 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 240, 255, 0.4)";
+  ctx.fill();
+  
+  ctx.shadowBlur = 0;
 }
 
 /* ===== エフェクト ===== */
 function drawEffects() {
-  effects.forEach(e => {
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = e.color;
-    ctx.fillStyle = `rgba(255, 255, 255, ${e.alpha})`;
-    ctx.font = `bold ${e.size}px 'Courier New'`;
-    ctx.textAlign = "center";
-    ctx.fillText(e.text, e.x, e.y);
-    ctx.shadowBlur = 0;
-  });
+  effects.forEach(e => {
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = e.color;
+    ctx.fillStyle = `rgba(255, 255, 255, ${e.alpha})`;
+    ctx.font = `bold ${e.size}px 'Courier New'`;
+    ctx.textAlign = "center";
+    ctx.fillText(e.text, e.x, e.y);
+    ctx.shadowBlur = 0;
+  });
 }
 
 /* ===== ゲームオーバー画面 ===== */
 function drawGameOver() {
-  ctx.fillStyle = "rgba(2, 2, 8, 0.9)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(2, 2, 8, 0.9)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  if (Math.random() < 0.4) {
-    ctx.fillStyle = "rgba(255, 0, 85, 0.15)";
-    ctx.fillRect(0, Math.random() * canvas.height, canvas.width, Math.random() * 80);
-  }
+  if (Math.random() < 0.4) {
+    ctx.fillStyle = "rgba(255, 0, 85, 0.15)";
+    ctx.fillRect(0, Math.random() * canvas.height, canvas.width, Math.random() * 80);
+  }
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#ff0055";
-  ctx.font = "bold 36px 'Courier New'";
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = "#ff0055";
-  ctx.fillText("SYSTEM FAILURE", canvas.width / 2, canvas.height / 2 - 40);
-  
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "22px 'Courier New'"; // スコア表示も少し拡大
-  ctx.shadowBlur = 0;
-  ctx.fillText(`FINAL SCORE: ${String(score).padStart(4, '0')}`, canvas.width / 2, canvas.height / 2 + 15);
-  
-  if (globalTimer % 40 < 25) {
-    ctx.fillStyle = "#00ffcc";
-    ctx.font = "bold 16px 'Courier New'";
-    ctx.fillText("> TAP TO REBOOT <", canvas.width / 2, canvas.height / 2 + 75);
-  }
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ff0055";
+  ctx.font = "bold 36px 'Courier New'";
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#ff0055";
+  ctx.fillText("SYSTEM FAILURE", canvas.width / 2, canvas.height / 2 - 40);
+  
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "22px 'Courier New'"; // スコア表示も少し拡大
+  ctx.shadowBlur = 0;
+  ctx.fillText(`FINAL SCORE: ${String(score).padStart(4, '0')}`, canvas.width / 2, canvas.height / 2 + 15);
+  
+  if (globalTimer % 40 < 25) {
+    ctx.fillStyle = "#00ffcc";
+    ctx.font = "bold 16px 'Courier New'";
+    ctx.fillText("> TAP TO REBOOT <", canvas.width / 2, canvas.height / 2 + 75);
+  }
 }
 
 /* ===== メインループ ===== */
 function draw() {
-  const cx = player.x - canvas.width / 2;
-  const cy = player.y - canvas.height / 2;
+  const cx = player.x - canvas.width / 2;
+  const cy = player.y - canvas.height / 2;
 
-  drawBackground(cx, cy);
-  generateObjects(cx, cy);
-  drawObjects(cx, cy);
-  drawPlayer();
-  drawParticles();
-  drawUI();
-  drawEffects();
-  drawJoystick();
-  
-  if (gameOver) drawGameOver();
+  drawBackground(cx, cy);
+  generateObjects(cx, cy);
+  drawObjects(cx, cy);
+  drawPlayer();
+  drawParticles();
+  drawUI();
+  drawEffects();
+  drawJoystick();
+  
+  if (gameOver) drawGameOver();
 }
 
 function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
+  update();
+  draw();
+  requestAnimationFrame(loop);
 }
 loop();
 </script>
